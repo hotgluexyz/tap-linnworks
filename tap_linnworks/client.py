@@ -8,7 +8,7 @@ from pendulum import parse
 from datetime import timedelta
 from typing import Any, Callable, Iterable
 
-from authenticator import LinnworksAuthenticator
+from tap_linnworks.authenticator import LinnworksAuthenticator
 from singer_sdk.helpers.jsonpath import extract_jsonpath
 from singer_sdk.pagination import BaseAPIPaginator  # noqa: TCH002
 from singer_sdk.streams import RESTStream
