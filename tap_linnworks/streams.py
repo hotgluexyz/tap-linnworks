@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import sys
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, Optional
 
 from singer_sdk.helpers.jsonpath import extract_jsonpath
 from singer_sdk import typing as th  # JSON Schema typing helpers
@@ -130,7 +130,7 @@ class ProcessedOrders(LinnworksStream):
         th.Property("IsResend", th.BooleanType),
         th.Property("IsExchange", th.BooleanType),
         th.Property("TaxId", th.StringType),
-        th.Property("FulfilmentLocationName", th.StringType)
+        th.Property("FulfilmentLocationName", th.StringType),
     ).to_dict()
 
     def parse_response(self, response):
@@ -166,3 +166,90 @@ class ProcessedOrders(LinnworksStream):
                 },
             }
         }
+    
+    def get_child_context(self, record: dict, context: Optional[dict]) -> dict:
+        """Return a context dictionary for child streams."""
+        return {
+            "processed_order_id": record["pkOrderID"],
+        }
+
+class ProcessedOrderItems(LinnworksStream):
+    name = "processed_order_items"
+    path = "/Orders/GetOrdersById"
+    primary_keys = ["OrderId"]
+    replication_key = None
+    records_jsonpath = "$.[*]"
+    rest_method = "POST"    
+    parent_stream_type = ProcessedOrders
+    schema = th.PropertiesList(
+        th.Property("OrderId", th.StringType),
+        th.Property("NumOrderId", th.IntegerType),
+        th.Property("Items", th.ArrayType(
+            th.ObjectType(
+                th.Property("ItemId", th.StringType),
+                th.Property("ItemNumber", th.StringType),
+                th.Property("SKU", th.StringType),
+                th.Property("ItemSource", th.StringType),
+                th.Property("Title", th.StringType),
+                th.Property("Quantity", th.IntegerType),
+                th.Property("CategoryName", th.StringType),
+                th.Property("StockLevelsSpecified", th.BooleanType),
+                th.Property("OnOrder", th.IntegerType),
+                th.Property("Level", th.IntegerType),
+                th.Property("AvailableStock", th.IntegerType),
+                th.Property("PricePerUnit", th.NumberType),
+                th.Property("UnitCost", th.NumberType),
+                th.Property("DespatchStockUnitCost", th.NumberType),
+                th.Property("Discount", th.NumberType),
+                th.Property("Tax", th.NumberType),
+                th.Property("TaxRate", th.NumberType),
+                th.Property("Cost", th.NumberType),
+                th.Property("CostIncTax", th.NumberType),
+                th.Property("CompositeSubItems", th.ArrayType(th.ObjectType())),
+                th.Property("IsService", th.BooleanType),
+                th.Property("SalesTax", th.NumberType),
+                th.Property("TaxCostInclusive", th.BooleanType),
+                th.Property("PartShipped", th.BooleanType),
+                th.Property("Weight", th.NumberType),
+                th.Property("BarcodeNumber", th.StringType),
+                th.Property("Market", th.IntegerType),
+                th.Property("ChannelSKU", th.StringType),
+                th.Property("ChannelTitle", th.StringType),
+                th.Property("DiscountValue", th.NumberType),
+                th.Property("HasImage", th.BooleanType),
+                th.Property("AdditionalInfo", th.ArrayType(th.ObjectType())),
+                th.Property("StockLevelIndicator", th.IntegerType),
+                th.Property("ShippingCost", th.NumberType),
+                th.Property("PartShippedQty", th.IntegerType),
+                th.Property("BatchNumberScanRequired", th.BooleanType),
+                th.Property("SerialNumberScanRequired", th.BooleanType),
+                th.Property("BinRack", th.StringType),
+                th.Property("BinRacks", th.ArrayType(
+                    th.ObjectType(
+                        th.Property("Quantity", th.IntegerType),
+                        th.Property("BinRack", th.StringType),
+                        th.Property("Location", th.StringType)
+                    )
+                )),
+                th.Property("InventoryTrackingType", th.IntegerType),
+                th.Property("isBatchedStockItem", th.BooleanType),
+                th.Property("IsWarehouseManaged", th.BooleanType),
+                th.Property("IsUnlinked", th.BooleanType),
+                th.Property("StockItemIntId", th.IntegerType),
+                th.Property("RowId", th.StringType),
+                th.Property("OrderId", th.StringType),
+                th.Property("StockItemId", th.StringType)
+            )
+        ))
+    ).to_dict()
+
+    def prepare_request_payload(self, context: dict | None, next_page_token: Any | None) -> dict | None:
+
+        return {
+            "pkOrderIds": [
+                context["processed_order_id"]
+            ]
+        }
+
+    def get_next_page_token(self, response, previous_token):
+        return None
