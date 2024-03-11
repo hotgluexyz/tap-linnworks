@@ -54,7 +54,7 @@ class TapLinnworks(Tap):
         return [
             streams.OpenOrders(self),
             streams.ProcessedOrders(self),
-            streams.ProcessedOrderItems(self),
+            streams.ProcessedOrderDetails(self),
         ]
 
 
