@@ -173,8 +173,8 @@ class ProcessedOrders(LinnworksStream):
             "processed_order_id": record["pkOrderID"],
         }
 
-class ProcessedOrderItems(LinnworksStream):
-    name = "processed_order_items"
+class ProcessedOrderDetails(LinnworksStream):
+    name = "processed_order_details"
     path = "/Orders/GetOrdersById"
     primary_keys = ["OrderId"]
     replication_key = None
@@ -240,7 +240,97 @@ class ProcessedOrderItems(LinnworksStream):
                 th.Property("OrderId", th.StringType),
                 th.Property("StockItemId", th.StringType)
             )
-        ))
+        )),
+        th.Property("Processed", th.BooleanType),
+        th.Property("ProcessedDateTime", th.DateTimeType),
+        th.Property("FulfilmentLocationId", th.StringType),
+        th.Property("GeneralInfo", th.ObjectType(
+                th.Property("Status", th.IntegerType),
+                th.Property("LabelPrinted", th.BooleanType),
+                th.Property("LabelError", th.StringType),
+                th.Property("InvoicePrinted", th.BooleanType),
+                th.Property("PickListPrinted", th.BooleanType),
+                th.Property("IsRuleRun", th.BooleanType),
+                th.Property("Notes", th.IntegerType),
+                th.Property("PartShipped", th.BooleanType),
+                th.Property("IsParked", th.BooleanType),
+                th.Property("ReferenceNum", th.StringType),
+                th.Property("SecondaryReference", th.StringType),
+                th.Property("ExternalReferenceNum", th.StringType),
+                th.Property("ReceivedDate", th.DateTimeType),
+                th.Property("Source", th.StringType),
+                th.Property("SubSource", th.StringType),
+                th.Property("HoldOrCancel", th.BooleanType),
+                th.Property("DespatchByDate", th.DateTimeType),
+                th.Property("HasScheduledDelivery", th.BooleanType),
+                th.Property("Location", th.StringType),
+                th.Property("NumItems", th.IntegerType),
+        )),
+        th.Property("ShippingInfo", th.ObjectType(
+                th.Property("Vendor", th.StringType),
+                th.Property("PostalServiceId", th.StringType),
+                th.Property("PostalServiceName", th.StringType),
+                th.Property("TotalWeight", th.NumberType),
+                th.Property("ItemWeight", th.NumberType),
+                th.Property("PackageCategoryId", th.StringType),
+                th.Property("PackageCategory", th.StringType),
+                th.Property("PackageTypeId", th.StringType),
+                th.Property("PackageType", th.StringType),
+                th.Property("PostageCost", th.NumberType),
+                th.Property("PostageCostExTax", th.NumberType),
+                th.Property("TrackingNumber", th.StringType),
+                th.Property("ManualAdjust", th.BooleanType),
+        )),
+        th.Property("CustomerInfo", th.ObjectType(
+                th.Property("ChannelBuyerName", th.StringType),
+                th.Property("Address", th.ObjectType(
+                        th.Property("EmailAddress", th.StringType),
+                        th.Property("Address1", th.StringType),
+                        th.Property("Address2", th.StringType),
+                        th.Property("Address3", th.StringType),
+                        th.Property("Town", th.StringType),
+                        th.Property("Region", th.StringType),
+                        th.Property("PostCode", th.StringType),
+                        th.Property("Country", th.StringType),
+                        th.Property("FullName", th.StringType),
+                        th.Property("Company", th.StringType),
+                        th.Property("PhoneNumber", th.StringType),
+                        th.Property("CountryId", th.StringType),
+                )),
+                th.Property("BillingAddress", th.ObjectType(
+                        th.Property("EmailAddress", th.StringType),
+                        th.Property("Address1", th.StringType),
+                        th.Property("Address2", th.StringType),
+                        th.Property("Address3", th.StringType),
+                        th.Property("Town", th.StringType),
+                        th.Property("Region", th.StringType),
+                        th.Property("PostCode", th.StringType),
+                        th.Property("Country", th.StringType),
+                        th.Property("FullName", th.StringType),
+                        th.Property("Company", th.StringType),
+                        th.Property("PhoneNumber", th.StringType),
+                        th.Property("CountryId", th.StringType),
+                )),
+            
+        )),
+        th.Property("TotalsInfo", th.ObjectType(
+                th.Property("Subtotal", th.NumberType),
+                th.Property("PostageCost", th.NumberType),
+                th.Property("PostageCostExTax", th.NumberType),
+                th.Property("Tax", th.NumberType),
+                th.Property("TotalCharge", th.NumberType),
+                th.Property("PaymentMethod", th.StringType),
+                th.Property("PaymentMethodId", th.StringType),
+                th.Property("ProfitMargin", th.NumberType),
+                th.Property("TotalDiscount", th.NumberType),
+                th.Property("Currency", th.StringType),
+                th.Property("CountryTaxRate", th.NumberType),
+                th.Property("ConversionRate", th.NumberType),
+        )),
+        th.Property("ExtendedProperties", th.ArrayType(th.ObjectType())),
+        th.Property("FolderName", th.ArrayType(th.StringType)),
+        th.Property("Notes", th.ArrayType(th.StringType))
+    
     ).to_dict()
 
     def prepare_request_payload(self, context: dict | None, next_page_token: Any | None) -> dict | None:
