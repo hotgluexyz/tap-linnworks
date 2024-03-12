@@ -327,8 +327,8 @@ class ProcessedOrderDetails(LinnworksStream):
                 th.Property("CountryTaxRate", th.NumberType),
                 th.Property("ConversionRate", th.NumberType),
         )),
-        th.Property("ExtendedProperties", th.ArrayType(th.ObjectType())),
-        th.Property("FolderName", th.ArrayType(th.StringType)),
+        th.Property("ExtendedProperties", th.CustomType({"type": ["array", "string"]})),
+        th.Property("FolderName", th.CustomType({"type": ["array", "string"]})),
         th.Property("Notes", th.CustomType({"type": ["array", "string"]})),
     
     ).to_dict()
