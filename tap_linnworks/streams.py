@@ -329,7 +329,7 @@ class ProcessedOrderDetails(LinnworksStream):
         )),
         th.Property("ExtendedProperties", th.ArrayType(th.ObjectType())),
         th.Property("FolderName", th.ArrayType(th.StringType)),
-        th.Property("Notes", th.ArrayType(th.StringType))
+        th.Property("Notes", th.CustomType({"type": ["array", "string"]})),
     
     ).to_dict()
 
