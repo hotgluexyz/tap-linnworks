@@ -14,7 +14,9 @@ if sys.version_info >= (3, 9):
     import importlib.resources as importlib_resources
 else:
     import importlib_resources
-
+import requests
+from http import HTTPStatus
+from singer_sdk.exceptions import FatalAPIError, RetriableAPIError
 
 class OpenOrders(LinnworksStream):
     name = "open_orders"
@@ -351,95 +353,114 @@ class ProcessedOrderDetails(LinnworksStream):
             "pkOrderIds":context["processed_order_id"]
         }
 
-class ProcessedOrderItems(LinnworksStream):
-    name = "processed_order_items"
-    path = "/Orders/GetOrdersById"
+class StockItems(LinnworksStream):
+    name = "stock_items"
+    path = "/Stock/GetStockItemsFull"
     primary_keys = ["ItemId"]
     replication_key = None
     records_jsonpath = "$.[*]"
-    parent_stream_type = ProcessedOrderDetails
+    rest_method = "POST"
 
     schema = th.PropertiesList(
-        th.Property("OrderId", th.StringType),
-        th.Property("ItemId", th.StringType),
+        th.Property("Suppliers", th.CustomType({"type": ["array", "string"]})),
+        th.Property("StockLevels", th.CustomType({"type": ["array", "string"]})),
+        th.Property("ItemChannelDescriptions", th.CustomType({"type": ["array", "string"]})),
+        th.Property("ItemExtendedProperties", th.CustomType({"type": ["array", "string"]})),
+        th.Property("ItemExtendedProperties", th.ArrayType(th.ObjectType(
+            th.Property("PropertyName", th.StringType),
+            th.Property("PropertyValue", th.StringType)
+        ))),
+        th.Property("ItemChannelTitles", th.CustomType({"type": ["array", "string"]})),
+        th.Property("ItemChannelPrices", th.CustomType({"type": ["array", "string"]})),
+        th.Property("Images", th.CustomType({"type": ["array", "string"]})),
         th.Property("ItemNumber", th.StringType),
-        th.Property("SKU", th.StringType),
-        th.Property("ItemSource", th.StringType),
-        th.Property("Title", th.StringType),
-        th.Property("Quantity", th.IntegerType),
-        th.Property("CategoryName", th.StringType),
-        th.Property("StockLevelsSpecified", th.BooleanType),
-        th.Property("OnOrder", th.IntegerType),
-        th.Property("Level", th.IntegerType),
-        th.Property("AvailableStock", th.IntegerType),
-        th.Property("PricePerUnit", th.NumberType),
-        th.Property("UnitCost", th.NumberType),
-        th.Property("DespatchStockUnitCost", th.NumberType),
-        th.Property("Discount", th.NumberType),
-        th.Property("Tax", th.NumberType),
-        th.Property("TaxRate", th.NumberType),
-        th.Property("Cost", th.NumberType),
-        th.Property("CostIncTax", th.NumberType),
-        th.Property("CompositeSubItems", th.ArrayType(th.ObjectType())),
-        th.Property("IsService", th.BooleanType),
-        th.Property("SalesTax", th.NumberType),
-        th.Property("TaxCostInclusive", th.BooleanType),
-        th.Property("PartShipped", th.BooleanType),
-        th.Property("Weight", th.NumberType),
+        th.Property("ItemTitle", th.StringType),
         th.Property("BarcodeNumber", th.StringType),
-        th.Property("Market", th.IntegerType),
-        th.Property("ChannelSKU", th.StringType),
-        th.Property("ChannelTitle", th.StringType),
-        th.Property("DiscountValue", th.NumberType),
-        th.Property("HasImage", th.BooleanType),
-        th.Property("AdditionalInfo", th.ArrayType(th.ObjectType())),
-        th.Property("StockLevelIndicator", th.IntegerType),
-        th.Property("ShippingCost", th.NumberType),
-        th.Property("PartShippedQty", th.IntegerType),
+        th.Property("MetaData", th.StringType),
+        th.Property("IsVariationParent", th.BooleanType),
+        th.Property("isBatchedStockType", th.BooleanType),
+        th.Property("PurchasePrice", th.NumberType),
+        th.Property("TaxRate", th.NumberType),
+        th.Property("PostalServiceId", th.StringType),
+        th.Property("CategoryId", th.StringType),
+        th.Property("CategoryName", th.StringType),
+        th.Property("PackageGroupId", th.StringType),
+        th.Property("Height", th.NumberType),
+        th.Property("Width", th.NumberType),
+        th.Property("Depth", th.NumberType),
+        th.Property("Weight", th.NumberType),
+        th.Property("CreationDate", th.DateTimeType),
+        th.Property("InventoryTrackingType", th.IntegerType),
         th.Property("BatchNumberScanRequired", th.BooleanType),
         th.Property("SerialNumberScanRequired", th.BooleanType),
-        th.Property("BinRack", th.StringType),
-        th.Property("BinRacks", th.ArrayType(
-            th.ObjectType(
-                th.Property("Quantity", th.IntegerType),
-                th.Property("BinRack", th.StringType),
-                th.Property("Location", th.StringType)
-            )
-        )),
-        th.Property("InventoryTrackingType", th.IntegerType),
-        th.Property("isBatchedStockItem", th.BooleanType),
-        th.Property("IsWarehouseManaged", th.BooleanType),
-        th.Property("IsUnlinked", th.BooleanType),
-        th.Property("StockItemIntId", th.IntegerType),
-        th.Property("RowId", th.StringType),
-        th.Property("OrderId", th.StringType),
-        th.Property("StockItemId", th.StringType)
+        th.Property("StockItemId", th.StringType),
+        th.Property("StockItemIntId", th.IntegerType)
     ).to_dict()
+
+    def get_next_page_token(self, response, previous_token):
+        
+        data = response.json()
+        if isinstance(data,list):
+            if previous_token:
+                return previous_token + 1
+            else:
+                #Default for next page
+                return 2
+
+        return None
+
+    def prepare_request_payload(self, context: dict | None, next_page_token: Any | None) -> dict | None:
+        
+        if next_page_token is None:
+            next_page_token = 1
+
+        return {
+            "loadVariationParents": True,
+            "loadCompositeParents": True,
+            "entriesPerPage": 200,
+            "pageNumber": next_page_token
+        }
+
     def get_child_context(self, record: dict, context: Optional[dict]) -> dict:
         """Return a context dictionary for child streams."""
         return {
-            "OrderId": record["OrderId"],
-            "ItemId":record["ItemId"]
+            "ItemId":record["StockItemId"]
         }
+    def validate_response(self, response: requests.Response) -> None:
+        
+        if (
+            response.status_code in self.extra_retry_statuses
+            or response.status_code >= HTTPStatus.INTERNAL_SERVER_ERROR
+        ):
+            msg = self.response_error_message(response)
+            raise RetriableAPIError(msg, response)
 
-    def get_records(self, context: Optional[dict]) -> Iterable[Dict[str, Any]]:
-        records = []
-        if context and context.get("order_items"):
-            records = context['order_items']
-        for record in records:
-            transformed_record = self.post_process(record, context)
-            if transformed_record is None:
-                # Record filtered out during post_process()
-                continue
-            yield transformed_record.copy()
+        if (
+            HTTPStatus.BAD_REQUEST
+            <= response.status_code
+            < HTTPStatus.INTERNAL_SERVER_ERROR
+        ):
+            data = response.json()
+            if "Message"in data:
+                if "No items found with given filter." in data['Message']:
+                    return
+            msg = self.response_error_message(response)
+            raise FatalAPIError(msg)
+    def parse_response(self, response):
+        data = response.json()
+        #When all records are fetched. API returns this message with 400 bad request. We need to stop fetching further records in this instance.
+        if "Message"in data:
+                if "No items found with given filter." in data['Message']:
+                    return None
+        yield from extract_jsonpath(self.records_jsonpath, input=response.json())    
 
-class ProcessedOrderItemImages(LinnworksStream):
-    name = "processed_order_item_images"
+class StockItemImages(LinnworksStream):
+    name = "stock_item_images"
     path = "/Inventory/GetInventoryItemImages"
     primary_keys = ["ItemId"]
     replication_key = None
     records_jsonpath = "$.[*]"
-    parent_stream_type = ProcessedOrderItems
+    parent_stream_type = StockItems
 
     schema = th.PropertiesList(
         th.Property("OrderId", th.StringType),
