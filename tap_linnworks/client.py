@@ -20,10 +20,6 @@ else:
 
 _Auth = Callable[[requests.PreparedRequest], requests.PreparedRequest]
 
-# TODO: Delete this is if not using json files for schema definition
-SCHEMAS_DIR = importlib_resources.files(__package__) / "schemas"
-
-
 class LinnworksStream(RESTStream):
     """Linnworks stream class."""
 
@@ -67,7 +63,10 @@ class LinnworksStream(RESTStream):
         context: dict | None,  # noqa: ARG002
         next_page_token: Any | None,  # noqa: ANN401
     ) -> dict[str, Any]:
-        return {}
+        params = {}
+        if self.name == "stock_item_images":
+            params['inventoryItemId'] = context.get("ItemId")
+        return params
 
     def parse_response(self, response: requests.Response) -> Iterable[dict]:
         yield from extract_jsonpath(self.records_jsonpath, input=response.json())

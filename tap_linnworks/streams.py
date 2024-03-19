@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import sys
 from datetime import datetime, timedelta
-from typing import Any, Optional
+from typing import Any, Optional, Iterable, Dict
 
 from singer_sdk.helpers.jsonpath import extract_jsonpath
 from singer_sdk import typing as th  # JSON Schema typing helpers
@@ -14,7 +14,9 @@ if sys.version_info >= (3, 9):
     import importlib.resources as importlib_resources
 else:
     import importlib_resources
-
+import requests
+from http import HTTPStatus
+from singer_sdk.exceptions import FatalAPIError, RetriableAPIError
 
 class OpenOrders(LinnworksStream):
     name = "open_orders"
@@ -341,5 +343,147 @@ class ProcessedOrderDetails(LinnworksStream):
             ]
         }
 
+    def get_next_page_token(self, response, previous_token):
+        return None
+    
+    def get_child_context(self, record: dict, context: Optional[dict]) -> dict:
+        """Return a context dictionary for child streams."""
+        return {
+            "order_items": record["Items"],
+            "pkOrderIds":context["processed_order_id"]
+        }
+
+class StockItems(LinnworksStream):
+    name = "stock_items"
+    path = "/Stock/GetStockItemsFull"
+    primary_keys = ["ItemId"]
+    replication_key = None
+    records_jsonpath = "$.[*]"
+    rest_method = "POST"
+
+    schema = th.PropertiesList(
+        th.Property("Suppliers", th.CustomType({"type": ["array", "string"]})),
+        th.Property("StockLevels", th.CustomType({"type": ["array", "string"]})),
+        th.Property("ItemChannelDescriptions", th.CustomType({"type": ["array", "string"]})),
+        th.Property("ItemExtendedProperties", th.CustomType({"type": ["array", "string"]})),
+        th.Property("ItemExtendedProperties", th.ArrayType(th.ObjectType(
+            th.Property("PropertyName", th.StringType),
+            th.Property("PropertyValue", th.StringType)
+        ))),
+        th.Property("ItemChannelTitles", th.CustomType({"type": ["array", "string"]})),
+        th.Property("ItemChannelPrices", th.CustomType({"type": ["array", "string"]})),
+        th.Property("Images", th.CustomType({"type": ["array", "string"]})),
+        th.Property("ItemNumber", th.StringType),
+        th.Property("ItemTitle", th.StringType),
+        th.Property("BarcodeNumber", th.StringType),
+        th.Property("MetaData", th.StringType),
+        th.Property("IsVariationParent", th.BooleanType),
+        th.Property("isBatchedStockType", th.BooleanType),
+        th.Property("PurchasePrice", th.NumberType),
+        th.Property("TaxRate", th.NumberType),
+        th.Property("PostalServiceId", th.StringType),
+        th.Property("CategoryId", th.StringType),
+        th.Property("CategoryName", th.StringType),
+        th.Property("PackageGroupId", th.StringType),
+        th.Property("Height", th.NumberType),
+        th.Property("Width", th.NumberType),
+        th.Property("Depth", th.NumberType),
+        th.Property("Weight", th.NumberType),
+        th.Property("CreationDate", th.DateTimeType),
+        th.Property("InventoryTrackingType", th.IntegerType),
+        th.Property("BatchNumberScanRequired", th.BooleanType),
+        th.Property("SerialNumberScanRequired", th.BooleanType),
+        th.Property("StockItemId", th.StringType),
+        th.Property("StockItemIntId", th.IntegerType)
+    ).to_dict()
+
+    def get_next_page_token(self, response, previous_token):
+        
+        data = response.json()
+        if isinstance(data,list):
+            if previous_token:
+                return previous_token + 1
+            else:
+                #Default for next page
+                return 2
+
+        return None
+
+    def prepare_request_payload(self, context: dict | None, next_page_token: Any | None) -> dict | None:
+        
+        if next_page_token is None:
+            next_page_token = 1
+
+        return {
+            "loadVariationParents": True,
+            "loadCompositeParents": True,
+            "entriesPerPage": 200,
+            "pageNumber": next_page_token
+        }
+
+    def get_child_context(self, record: dict, context: Optional[dict]) -> dict:
+        """Return a context dictionary for child streams."""
+        return {
+            "ItemId":record["StockItemId"]
+        }
+    def validate_response(self, response: requests.Response) -> None:
+        
+        if (
+            response.status_code in self.extra_retry_statuses
+            or response.status_code >= HTTPStatus.INTERNAL_SERVER_ERROR
+        ):
+            msg = self.response_error_message(response)
+            raise RetriableAPIError(msg, response)
+
+        if (
+            HTTPStatus.BAD_REQUEST
+            <= response.status_code
+            < HTTPStatus.INTERNAL_SERVER_ERROR
+        ):
+            data = response.json()
+            if "Message"in data:
+                if "No items found with given filter." in data['Message']:
+                    return
+            msg = self.response_error_message(response)
+            raise FatalAPIError(msg)
+    def parse_response(self, response):
+        data = response.json()
+        #When all records are fetched. API returns this message with 400 bad request. We need to stop fetching further records in this instance.
+        if "Message"in data:
+                if "No items found with given filter." in data['Message']:
+                    return None
+        yield from extract_jsonpath(self.records_jsonpath, input=response.json())    
+
+class StockItemImages(LinnworksStream):
+    name = "stock_item_images"
+    path = "/Inventory/GetInventoryItemImages"
+    primary_keys = ["ItemId"]
+    replication_key = None
+    records_jsonpath = "$.[*]"
+    parent_stream_type = StockItems
+
+    schema = th.PropertiesList(
+        th.Property("OrderId", th.StringType),
+        th.Property("ItemId", th.StringType),
+        th.Property("Source", th.StringType),
+        th.Property("FullSource", th.StringType),
+        th.Property("CheckSumValue", th.StringType),
+        th.Property("pkRowId", th.StringType),
+        th.Property("IsMain", th.BooleanType),
+        th.Property("SortOrder", th.NumberType),
+        th.Property("StockItemId", th.StringType),
+        th.Property("StockItemIntId", th.NumberType)
+    ).to_dict()
+    def post_process(
+        self,
+        row: dict,
+        context: dict | None = None,  # noqa: ARG002
+    ) -> dict | None:
+        if "OrderId" in context:
+            row['OrderId'] = context['OrderId']
+        if "ItemId" in context:
+            row['ItemId'] = context['ItemId']
+        return row
+    
     def get_next_page_token(self, response, previous_token):
         return None
