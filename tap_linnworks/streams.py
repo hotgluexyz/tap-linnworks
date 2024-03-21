@@ -157,7 +157,7 @@ class ProcessedOrders(LinnworksStream):
 
         return {
             "request": {
-                "PageNumber": 1,
+                "PageNumber": next_page_token,
                 "ResultsPerPage": 500,
                 "DateField": "processed",
                 "FromDate": start_date,
