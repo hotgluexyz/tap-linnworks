@@ -142,7 +142,7 @@ class ProcessedOrders(LinnworksStream):
         root = response.json().get("ProcessedOrders")
         actual_page = root.get("PageNumber")
         total_pages = root.get("TotalPages")
-
+        
         if actual_page < total_pages:
             return actual_page + 1
 
@@ -157,7 +157,7 @@ class ProcessedOrders(LinnworksStream):
 
         return {
             "request": {
-                "PageNumber": 1,
+                "PageNumber": next_page_token,
                 "ResultsPerPage": 500,
                 "DateField": "processed",
                 "FromDate": start_date,
