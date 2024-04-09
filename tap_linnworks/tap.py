@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 from singer_sdk import Tap
-from singer_sdk import typing as th  # JSON schema typing helpers
+from singer_sdk import typing as th
 
-# TODO: Import your custom stream types here:
 from tap_linnworks import streams
 
 
@@ -13,8 +12,8 @@ class TapLinnworks(Tap):
     """Linnworks tap class."""
 
     name = "tap-linnworks"
+    api_key = ""
 
-    # TODO: Update this section with the actual config values you expect:
     config_jsonschema = th.PropertiesList(
         th.Property(
             "start_date",
