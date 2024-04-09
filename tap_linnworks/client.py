@@ -8,10 +8,10 @@ from pendulum import parse
 from datetime import timedelta
 from typing import Any, Callable, Iterable
 
-from tap_linnworks.authenticator import LinnworksAuthenticator
 from singer_sdk.helpers.jsonpath import extract_jsonpath
-from singer_sdk.pagination import BaseAPIPaginator  # noqa: TCH002
+from singer_sdk.pagination import BaseAPIPaginator
 from singer_sdk.streams import RESTStream
+from singer_sdk.authenticators import APIKeyAuthenticator
 
 if sys.version_info >= (3, 9):
     import importlib.resources as importlib_resources
@@ -31,12 +31,22 @@ class LinnworksStream(RESTStream):
     next_page_token_jsonpath = "$.next_page"
 
     @property
-    def authenticator(self) -> LinnworksAuthenticator:
-        return LinnworksAuthenticator.create_for_stream(
-            self,
-            application_id=self.config.get("application_id"),
-            application_secret=self.config.get("application_secret"),
-            installation_token=self.config.get("installation_token"),
+    def authenticator(self):
+        if self._tap.api_key == "":
+            body = {
+                "Token": self.config.get("installation_token"),
+                "ApplicationId": self.config.get("application_id"),
+                "ApplicationSecret": self.config.get("application_secret")
+            }
+            response = requests.post(
+                "https://api.linnworks.net/api/Auth/AuthorizeByApplication",
+                json=body
+            )
+            response.raise_for_status()
+            self._tap.api_key = response.json()["Token"]
+
+        return APIKeyAuthenticator.create_for_stream(
+            self, key="Authorization", value=self._tap.api_key, location="header"
         )
 
     @property
