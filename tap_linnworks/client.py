@@ -6,12 +6,13 @@ import sys
 import requests
 from pendulum import parse
 from datetime import timedelta
-from typing import Any, Callable, Iterable
+from typing import Any, Callable, Iterable, Generator
 
 from singer_sdk.helpers.jsonpath import extract_jsonpath
 from singer_sdk.pagination import BaseAPIPaginator
 from singer_sdk.streams import RESTStream
 from singer_sdk.authenticators import APIKeyAuthenticator
+import backoff
 
 if sys.version_info >= (3, 9):
     import importlib.resources as importlib_resources
@@ -67,6 +68,12 @@ class LinnworksStream(RESTStream):
             return actual_page + 1
 
         return None
+    
+    def backoff_wait_generator(self) -> Generator[float, None, None]:
+        return backoff.constant(interval=60) 
+    
+    def backoff_max_tries(self) -> int:
+        return 5
 
     def get_url_params(
         self,
