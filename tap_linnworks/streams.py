@@ -380,11 +380,14 @@ class StockItems(LinnworksStream):
         th.Property("IsVariationParent", th.BooleanType),
         th.Property("isBatchedStockType", th.BooleanType),
         th.Property("PurchasePrice", th.NumberType),
+        th.Property("RetailPrice", th.NumberType),
         th.Property("TaxRate", th.NumberType),
         th.Property("PostalServiceId", th.StringType),
+        th.Property("PostalServiceName", th.StringType),
         th.Property("CategoryId", th.StringType),
         th.Property("CategoryName", th.StringType),
         th.Property("PackageGroupId", th.StringType),
+        th.Property("PackageGroupName", th.StringType),
         th.Property("Height", th.NumberType),
         th.Property("Width", th.NumberType),
         th.Property("Depth", th.NumberType),
@@ -418,7 +421,18 @@ class StockItems(LinnworksStream):
             "loadVariationParents": True,
             "loadCompositeParents": True,
             "entriesPerPage": 200,
-            "pageNumber": next_page_token
+            "pageNumber": next_page_token,
+            "dataRequirements": [
+                "StockLevels",
+                "Pricing",
+                "Supplier",
+                "ShippingInformation",
+                "ChannelTitle",
+                "ChannelDescription",
+                "ChannelPrice",
+                "ExtendedProperties",
+                "Images",
+            ],
         }
 
     def get_child_context(self, record: dict, context: Optional[dict]) -> dict:
