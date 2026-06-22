@@ -56,6 +56,7 @@ class TapLinnworks(Tap):
             streams.ProcessedOrderDetails(self),
             streams.StockItems(self),
             streams.StockItemImages(self),
+            streams.Countries(self),
         ]
 
 
