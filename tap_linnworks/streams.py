@@ -501,3 +501,42 @@ class StockItemImages(LinnworksStream):
     
     def get_next_page_token(self, response, previous_token):
         return None
+
+
+class Countries(LinnworksStream):
+    name = "countries"
+    path = "/Inventory/GetCountries"
+    primary_keys = ["CountryId"]
+    replication_key = None
+    records_jsonpath = "$[*]"
+    rest_method = "GET"
+
+    schema = th.PropertiesList(
+        th.Property("CountryId", th.StringType),
+        th.Property("CountryName", th.StringType),
+        th.Property("CountryCode", th.StringType),
+        th.Property("Continent", th.StringType),
+        th.Property("Currency", th.StringType),
+        th.Property("CustomsRequired", th.BooleanType),
+        th.Property("TaxRate", th.NumberType),
+        th.Property("AddressFormat", th.StringType),
+        th.Property(
+            "Regions",
+            th.ArrayType(
+                th.ObjectType(
+                    th.Property("pkRegionRowId", th.IntegerType),
+                    th.Property("RegionCode", th.StringType),
+                    th.Property("RegionName", th.StringType),
+                    th.Property("TaxRate", th.NumberType),
+                    th.Property("fkCountryId", th.StringType),
+                    th.Property("ReplaceWith", th.StringType),
+                    th.Property("IsHomeRegion", th.BooleanType),
+                    th.Property("TagsCount", th.IntegerType),
+                )
+            ),
+        ),
+        th.Property("RegionsCount", th.IntegerType),
+    ).to_dict()
+
+    def get_next_page_token(self, response, previous_token):
+        return None
